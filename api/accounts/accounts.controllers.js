@@ -1,46 +1,75 @@
-let accounts = require('../../accounts');
+const Account = require('../../models/Account');
 
-exports.accountCreate = (req, res) => {
-  const id = accounts[accounts.length - 1].id + 1;
-  const newAccount = { ...req.body, funds: 0, id };
-  accounts.push(newAccount);
-  res.status(201).json(newAccount);
+exports.accountsGet = async (req, res) => {
+  try {
+    const accounts = await Account.find();
+    res.json(accounts);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
-exports.accountDelete = (req, res) => {
+exports.accountCreate = async (req, res) => {
+  try {
+    const newAccount = await Account.create(req.body);
+    res.status(201).json(newAccount);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.accountDelete = async (req, res) => {
   const { accountId } = req.params;
-  const foundAccount = accounts.find((account) => account.id === +accountId);
-  if (foundAccount) {
-    accounts = accounts.filter((account) => account.id !== +accountId);
-    res.status(204).end();
-  } else {
-    res.status(404).json({ message: 'Account not found' });
+  try {
+    const foundAccount = await Account.findById(accountId);
+
+    if (foundAccount) {
+      await foundAccount.remove();
+      res.status(204).end();
+    } else {
+      console.log('foundAccount', foundAccount);
+      res.status(404).json({ message: 'Account not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };
 
-exports.accountUpdate = (req, res) => {
+exports.accountUpdate = async (req, res) => {
   const { accountId } = req.params;
-  const foundAccount = accounts.find((account) => account.id === +accountId);
-  if (foundAccount) {
-    foundAccount.funds = req.body.funds;
-    res.status(204).end();
-  } else {
-    res.status(404).json({ message: 'Account not found' });
+  const body = req.body;
+  const state = { new: true };
+  try {
+    const foundAccount = await Account.findById(accountId);
+    if (foundAccount) {
+      await Account.findByIdAndUpdate(accountId, {
+        _id: accountId,
+        username: body.username,
+        funds: body.funds,
+        state,
+      });
+      res.status(204).end();
+    } else {
+      res.status(404).json({ message: 'Account not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };
 
-exports.accountsGet = (req, res) => {
-  res.json(accounts);
-};
-
-exports.getAccountByUsername = (req, res) => {
-  const { username } = req.params;
-  const foundAccount = accounts.find(
-    (account) => account.username === username
-  );
-  if (req.query.currency === 'usd') {
-    const accountInUsd = { ...foundAccount, funds: foundAccount.funds * 3.31 };
-    res.status(201).json(accountInUsd);
+exports.getAccountByMoreFunds = async (req, res) => {
+  const { funds } = req.params;
+  const accounts = await Account.find();
+  const foundAccounts = accounts.filter((account) => account.funds > +funds);
+  try {
+    if (foundAccounts.length !== 0) {
+      res.json(foundAccounts);
+    } else {
+      res
+        .status(404)
+        .json({ message: 'Accounts with higher funds are not available' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
-  res.status(201).json(foundAccount);
 };
